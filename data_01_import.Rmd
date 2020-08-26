@@ -1,0 +1,532 @@
+---
+title: "Import and Merge DETECT Follow-up Interview Data"
+---
+
+```{r message=FALSE}
+library(dplyr)
+library(DBI)
+library(odbc)
+library(keyring)
+library(purrr)
+library(stringr)
+library(readr)
+library(lubridate)
+library(hms)
+library(testthat)
+```
+
+# Open the Connection to the FM database
+
+You must first connect to the UTHealth VPN
+Keyring notes: https://db.rstudio.com/best-practices/managing-credentials/
+Keychain error: https://github.com/r-lib/keyring/issues/45#issuecomment-332491293
+
+```{r}
+con <- dbConnect(
+  odbc(),
+  driver   = "/Library/ODBC/FileMaker ODBC.bundle/Contents/MacOS/FileMaker ODBC",
+  server   = "spsqlapwv003.sph.uthouston.edu",
+  database = "DETECT",
+  uid      = key_list("detect_fm_db_readonly")[1,2],
+  pwd      = key_get("detect_fm_db_readonly")
+)
+```
+
+# Pull tables into R as data frames
+
+## ParticipantCallLog 
+
+ParticipantCallLog has call log data from every call made. However, it doesn't have data for any of the screening questions.
+
+## PhoneRecruitment
+
+PhoneRecruitment has data for the screening questions, but only for the calls that made it that far. It doesn't have data for every call made.
+
+## ParticipantScheduler 
+
+ParticipantScheduler contains the date and time for the scheduled follow-up interview.
+
+## Consent 
+
+Consent contains information on whether a person gave consent or not.
+
+## GiftCard
+
+GiftCard contains one row for each gift card given out. It also contains all the follow-up interview questions.
+
+## Participant
+
+Participant contains info from MedStar's EPCR including the original DETECT screenings.
+
+```{r}
+walk(
+  # List of tables to import
+  c("ParticipantCallLog", "PhoneRecruitment", "ParticipantScheduler", 
+    "Consent", "GiftCard", "Participant"),
+  
+  # Import and add data frames to the global environment
+  function(x) {
+    df <- dbReadTable(con, x)
+    # Convert camel case to snake case for df name
+    nm <- str_replace_all(x, "(\\B)([A-Z])", "_\\2")
+    nm <- str_to_lower(nm)
+    assign(nm, df, envir = .GlobalEnv)
+  }
+)
+```
+
+# Close the connection to the database
+
+```{r}
+dbDisconnect(con)
+rm(con)
+```
+
+# Initial data wrangling
+
+## Convert all variable names to snake case
+
+```{r}
+# Convert all variable names to snake case
+walk(
+  # Grab the names of all data frames in the global envrironment
+  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
+  .f = function(x) {
+    # Grab individual df from environment
+    df <- get(x)
+    # Grab the variables names
+    var_names <- names(df)
+    # Convert variable names to snake case
+    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
+    # Convert variable names to lower case
+    var_names <- str_to_lower(var_names)
+    # Fix medstar_id
+    var_names[var_names == "medstar_i_d"] <- "medstar_id"
+    # assign back to the dataframe
+    names(df) <- var_names
+    # Replace df with new names in global environment
+    assign(x, df, envir = .GlobalEnv)
+  }
+)
+```
+
+## Keep only the columns needed from each data frame
+
+```{r}
+# Columns to keep in every data frame
+start_cols <- c("medstar_id", "x_created_timestamp", "x_created_by", 
+                   "x_modified_timestamp", "x_modified_by", "name_full")
+```
+
+```{r}
+participant_call_log_sub <- participant_call_log %>% 
+  select(all_of(start_cols), response, notes, response_recode, answered_by)
+```
+
+```{r}
+phone_recruitment_sub <- phone_recruitment %>% 
+  select(all_of(start_cols), x_record_status, phone_initial_request:x_moca_orientation_date,
+         x_record_comment, phone_more_info, phone_alzheimer_follow_up)
+```
+
+```{r}
+participant_scheduler_sub <- participant_scheduler %>% 
+  # After some trial and error below, these are the only columns we need from
+  # this data frame.
+  select(medstar_id, appointment_date, appointment_time, assigned_interviewer)
+```
+
+```{r}
+consent_sub <- consent %>% 
+  # After some trial and error below, these are the only columns we need from
+  # this data frame.
+  select(
+    medstar_id, conset_created_by = x_created_by, 
+    consent_timestamp = x_created_timestamp, censent_status = x_record_status
+  )
+```
+
+
+```{r}
+# A bunch of the follow-up interview questions are in the gift card data. I'm dropping them for now, but I may want to add them back in later.
+gift_card_sub <- gift_card %>% 
+  select(medstar_id, gift_card_status = x_record_status)
+```
+
+```{r}
+rm(start_cols)
+```
+
+# Merge the data frames together
+
+Through some previous trial and error, we know that there are rows in the data frames above that don't have matches in the call log when we try to merge on medstar id and the record created timestamp. Additionally, we know that there are even medstar id's that appear in the some of the data frames, but not the call log. This shouldn't happen, but there were some instances when people were called and an entry was never made in the call log. Over time, we've taken steps to prevent that from happening, but we still need to do our best to incorporate all the rows from all the data frames into a single data frame. That will require some manipulation of the data.
+
+## Call log and phone_recruitment
+
+### Check MedStar IDs
+
+#### MedStar IDs that exist in phone_recruitment, but not participant_call_log
+
+How many medstar ids are in phone recruitment, but not the call log?
+
+```{r}
+ids_in_rec_not_cl <- phone_recruitment_sub %>% 
+  anti_join(participant_call_log_sub, by = c("medstar_id" = "medstar_id")) %>% 
+  select(medstar_id, x_record_status, phone_initial_request, x_created_timestamp) 
+```
+
+On 2020-08-25, there are 232 (this number will change) medstar ids in the phone recruitment data that don't have a match in the call log. We did a manual review of some of these records in FM Pro. For all of these medstar ids, there truly is no record in the call log. However, there is sometimes other information we can use to make reasonable assumptions about whether or not a call was made. This is important for getting the most accurate count of calls made possible. 
+
+* If record status is incomplete and phone_initial_request is missing (i.e., the scheduler did not select an option for the "make intial contact" question), then there is no reason to beleive a call was made. Perhaps they just clicked on the record and then clicked back to the participant list. We will drop those rows from the phone_recruitment_sub before merging.
+
+```{r}
+# Ids to drop from phone_recruitment_sub before merging
+ids_in_rec_not_cl_drop <- ids_in_rec_not_cl %>% 
+  filter(x_record_status == "Incomplete" & is.na(phone_initial_request)) %>% 
+  pull(medstar_id)
+
+phone_recruitment_sub <- phone_recruitment_sub %>% 
+  filter(!(medstar_id %in% ids_in_rec_not_cl_drop))
+```
+
+```{r}
+# Data check
+test_that("Make sure the correct number of rows were dropped from phone_recruitment_sub", {
+  n_expected <- nrow(phone_recruitment) - length(ids_in_rec_not_cl_drop)
+  n_actual <- nrow(phone_recruitment_sub)
+  expect_equal(n_expected, n_actual)
+})
+```
+
+* If the record status is something other than incomplete (e.g., participant refused or bad contact number) OR if phone_initial_request_rec is NOT missing (i.e., the scheduler selected an option for the "make intial contact" question), then we will assume that a call was made, but the scheduler failed to create a record in the call log. In these cases, we will retain the rows in the merged data. We will use the medstar id from phone_recruitment_sub and set the timestamp for the call to the same time as the timestamp in the phone_recruitment_sub. It may not be exactly correct, but it should be very close. This procedure is actually carried out below after the merge. We actually end up taking a different approach below, but I'm leaving this explanation to understand what was already considered in the future.
+
+```{r}
+rm(ids_in_rec_not_cl_drop, ids_in_rec_not_cl)
+```
+
+#### MedStar IDs that exist in participant_call_log, but not phone_recruitment 
+
+```{r}
+ids_in_cl_not_rec <- participant_call_log_sub %>% 
+  anti_join(phone_recruitment_sub, by = c("medstar_id" = "medstar_id")) %>% 
+  pull(medstar_id)
+```
+
+On 2020-08-25, there were 2 medstar ids that appeared in the call log data, but not the the phone_recruitment data. I'm not sure how that happened, but I reviewed both medstar ids manually in FM Pro. After updating the records in FM Pro, those ids now appear in the call log.
+
+```{r}
+# Data check
+test_that("Make sure there are no MedStar IDs that appear in participant_call_log, but not phone_recruitment.", {
+  expect_equal(length(ids_in_cl_not_rec), 0)
+})
+```
+
+```{r}
+rm(ids_in_cl_not_rec)
+```
+
+### Tag the last row for each MedStar ID
+
+My original plan was to merge rows on medstar id and record created timestamp. However, I don't think that is going to work. It looks like there is one record per medstar id in the phone_recruitment data. It looks like the record created timestamp is the date/time the "Phone Recruitment" layout in FM was first opened. It's always just a little bit before the created timestamp for the earliest entry in the call log (when there is an entry in the call log). But, it looks like the information in the phone_recruitment data always goes with the last row of the call log (e.g., "a0d03"). So, we will merged on medstar_id, but only for the last row for each id in the call log. 
+
+First, we will make sure there is only one row for each MedStar ID in the phone recruitment data.
+
+```{r}
+# Data check
+test_that("Make sure there is only one row for each MedStar ID in the phone recruitment data. This is necessary for merging the call log and phone recruitment data.", {
+  rows <- nrow(phone_recruitment_sub)
+  ids  <- length(unique(phone_recruitment_sub$medstar_id))
+  expect_equal(rows, ids)
+})
+```
+
+Next, we will create a last_row variable to merge on.
+
+```{r}
+participant_call_log_sub <- participant_call_log_sub %>%
+  mutate(
+    row = row_number(),
+    last_row = row == max(row)
+  )
+
+phone_recruitment_sub <- phone_recruitment_sub %>% 
+  # We already checked above to make sure that there is only one row for each 
+  # MedStar ID
+  mutate(last_row = TRUE)
+```
+
+### Merge the call log and phone recruitment
+
+Remember, there are some MedStar ids that are in the phone recruitment data, but not the call log (see above for details). There are no MedStar ids that are in the call log, but not the phone recruitment data (we check for this above). Therefore, we full_join the phone recruitment data to the call log data (i.e., call log data is first, but all rows from both data frames are retained).
+
+```{r}
+merged_phone_recruitment <- participant_call_log_sub %>% 
+  full_join(
+    phone_recruitment_sub, 
+    by = c("medstar_id", "last_row"),
+    suffix = c("_cl", "_pr")
+  )
+```
+
+### Fill-in information for MedStar IDs that exist in phone_recruitment, but not participant_call_log
+
+47d9f is a good example. It looks like the first call attempt sounded like a fax number. On the second call attempt, the participant answered the phone and began the MOCA (although they did not complete it). However, the phone recruiter never made an entry in the call log for the second call. Our first thought was to set the timestamp for the call to the same time as the timestamp in the phone_recruitment_sub. The problem is that timestamp from phone_recruitment_sub is the first time the participant's record was opened. This will be earlier than the first call ever made -- and perhaps many days earlier than the call associated with the record from phone_recruitment_sub. For now, I'm just going to keep this data missing and see how that affects things.
+
+At this point:
+
+* Each row in merged_phone_recruitment represents a unique phone call made to attempt to recruit the participant. 
+
+* When the participant was contacted, there will be values for the screening questions that came from phone_recruitment_sub. Otherwise, the values for those columns will be missing.
+
+* There are a small percentage of MedStar IDs in merged_phone_recruitment that are missing one or more call log entries, but have values for at least one variable from phone_recruitment_sub. For these cases, we assume that a call was made, but the scheduler failed to create a record in the call log. We are constantly trying to implement checks that prevent this from happening.
+
+## merged_phone_recruitment and participant_scheduler
+
+### keep rows from participant_scheduler with information
+
+Only a small percentage of the rows in the participant_scheduler data frame actually contains data about when a follow-up interview was scheduled. The majority of the rows are just missing data. There is no reason to try to merge those rows. So, below, we will only keep rows that contain information about when a follow-up interview as scheduled.
+
+```{r}
+participant_scheduler_sub <- participant_scheduler_sub %>% 
+  filter(!is.na(appointment_date))
+```
+
+### Check MedStar IDs
+
+How many MedStar IDs are in participant_scheduler, but not the merged_phone_recruitment? There shoudn't be any.
+
+```{r}
+# Data check
+test_that("Make sure there are no MedStar IDs that appear in participant_scheduler_sub, but not merged_phone_recruitment.", {
+  ps_ids  <- participant_scheduler_sub$medstar_id
+  mpr_ids <- merged_phone_recruitment$medstar_id
+  expect_equal(length(setdiff(ps_ids, mpr_ids)), 0)
+})
+```
+
+Also, make sure that there aren't any repeated MedStar IDs in the participant_scheduler data. 
+
+```{r}
+# Data check
+test_that("Make sure there is only one row for each MedStar ID in the participant_scheduler data. This is necessary for merging participant_scheduler with merged_phone_recruitment.", {
+  rows <- nrow(participant_scheduler_sub)
+  ids  <- length(unique(participant_scheduler_sub$medstar_id))
+  expect_equal(rows, ids)
+})
+```
+
+Next, we will create a last_row variable to merge on.
+
+```{r}
+participant_scheduler_sub <- participant_scheduler_sub %>% 
+  # We already checked above to make sure that there is only one row for each 
+  # MedStar ID
+  mutate(last_row = TRUE)
+```
+
+### Merge participant_scheduler with merged_phone_recruitment
+
+```{r}
+merged_phone_recruitment <- merged_phone_recruitment %>% 
+  left_join(participant_scheduler_sub, by = c("medstar_id", "last_row"))
+```
+
+## merged_phone_recruitment and consent
+
+### Check MedStar IDs
+
+How many MedStar IDs are in consent, but not the merged_phone_recruitment? There is actually one MedStar ID (01e9b) that exists in the consent data, but not the merged_phone_recruitment data. I did a check on FileMaker Pro. It looks like this person does have a completed F/U interview, but no phone screening data. I emailed Sunil to see if he had and insight. In the meantime, I'm going to set the data check to allow for one MedStar ID that exists in the consent data, but not the merged_phone_recruitment data, and throw an error otherwise.
+
+```{r}
+# Data check
+test_that("Make sure there is only one MedStar ID that appears in consent, but not merged_phone_recruitment.", {
+  con_ids  <- consent_sub$medstar_id
+  mpr_ids <- merged_phone_recruitment$medstar_id
+  expect_equal(length(setdiff(con_ids, mpr_ids)), 1)
+})
+```
+
+Also, make sure that there aren't any repeated MedStar IDs in the consent data. 
+
+```{r}
+# Data check
+test_that("Make sure there is only one row for each MedStar ID in the consent data. This is necessary for merging consent with merged_phone_recruitment.", {
+  rows <- nrow(consent_sub)
+  ids  <- length(unique(consent_sub$medstar_id))
+  expect_equal(rows, ids)
+})
+```
+
+Next, we will create a last_row variable to merge on.
+
+```{r}
+consent_sub <- consent_sub %>% 
+  # We already checked above to make sure that there is only one row for each 
+  # MedStar ID
+  mutate(last_row = TRUE)
+```
+
+### Merge consent with merged_phone_recruitment
+
+Use full join because there is one MedStar ID that exists 
+
+```{r}
+merged_followup <- merged_phone_recruitment %>% 
+  full_join(consent_sub, by = c("medstar_id", "last_row"))
+```
+
+## merged_followup and gift cards
+
+### Check MedStar IDs
+
+How many MedStar IDs are in gift cards, but not the merged_followup?
+
+```{r}
+# Data check
+test_that("Make sure there is only one MedStar ID that appears in gift cards, but not merged_followup.", {
+  gc_ids  <- gift_card_sub$medstar_id
+  mfu_ids <- merged_followup$medstar_id
+  expect_equal(length(setdiff(gc_ids, mfu_ids)), 0)
+})
+```
+
+Also, make sure that there aren't any repeated MedStar IDs in the gift cards data. 
+
+```{r}
+# Data check
+test_that("Make sure there is only one row for each MedStar ID in the gift cards data. This is necessary for merging gift cards with merged_followup.", {
+  rows <- nrow(gift_card_sub)
+  ids  <- length(unique(gift_card_sub$medstar_id))
+  expect_equal(rows, ids)
+})
+```
+
+Next, we will create a last_row variable to merge on.
+
+```{r}
+gift_card_sub <- gift_card_sub %>% 
+  # We already checked above to make sure that there is only one row for each 
+  # MedStar ID
+  mutate(last_row = TRUE)
+```
+
+### Merge consent with merged_followup
+
+```{r}
+merged_followup <- merged_followup %>% 
+  left_join(gift_card_sub, by = c("medstar_id", "last_row"))
+```
+
+
+
+
+
+
+
+
+Left off here... 
+
+
+Merge consent, gift_card, detect
+
+Need to make sure I have all the variables I need from gift card data. Also, need to get on VPN for the DETECT data.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Save record of data manipulation
+
+I'm not sure it makes sense to save this to an external file when using Shiny. Maybe it can be part of a quality control tab or something. We will save the results of these operations for tracking data quality over time.
+
+```{r}
+# Create it the first time then update it after
+if(file.exists("merge_conflicts.csv")) {
+  merge_conflicts <- read_csv("merge_conflicts.csv")
+} else {
+  merge_conflicts <- tibble(
+    date = Sys.Date()
+  )
+  # Save to be updated in the future
+  write_csv(merge_conflicts, "merge_conflicts.csv")
+}
+```
+
+```{r}
+merge_conflicts_new <- tibble(
+  date = Sys.Date(),
+  conflicts = 232
+)
+```
+
+```{r}
+merge_conflicts <- merge_conflicts %>% bind_rows(merge_conflicts_new)
+```
+
+```{r}
+write_csv(merge_conflicts, "merge_conflicts.csv")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+* Convert timestamps to POSIXct class (combine like commands across data frames later)
+

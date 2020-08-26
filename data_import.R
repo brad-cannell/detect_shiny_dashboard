@@ -21,10 +21,15 @@ con <- DBI::dbConnect(
 )
 
 # Pull tables into R as data frames
+# ---------------------------------
+# call_log has info about every call made
 call_log              <- DBI::dbReadTable(con, "ParticipantCallLog")
+# phone_recruitment has all the screening info
+phone_recruitment     <- DBI::dbReadTable(con, "PhoneRecruitment")
+# participant_scheduler is used to mark scheduled follow-up interviews
 participant_scheduler <- DBI::dbReadTable(con, "ParticipantScheduler")
+# gift_card is used to mark completed follow-up interviews
 gift_card             <- DBI::dbReadTable(con, "GiftCard")
-moca                  <- DBI::dbReadTable(con, "PhoneRecruitment")
 
 # Close the connection to the database
 DBI::dbDisconnect(con)
@@ -134,6 +139,19 @@ call_log <- call_log %>%
     "14-14:59", "15-15:59", "16-16:59", "17-17:59", "18-18:59"
   )))
 
+
+# Clean phone_recruitment
+# -----------------------------------------------------------------------------
+phone_recruitment <- phone_recruitment %>% 
+  # Keep fields that don't overlap with call_log
+  select(medstar_id, x_created_timestamp, phone_verify_number:x_moca_serial7_3)
+
+pr_test <- slice(phno)
+
+test <- call_log %>% 
+  left_join(phone_recruitment, by = c("medstar_id", "x_created_timestamp"))
+
+
 # Clean participant_scheduler
 # -----------------------------------------------------------------------------
 ## Keep scheduled rows only
@@ -168,11 +186,15 @@ scheduled_ids <- scheduled_ids %>%
 n_completed <- nrow(gift_card)
 
 
-# Clean moca
+
+
+# Merge data
 # -----------------------------------------------------------------------------
-## Deidentify data for local storage
-moca_deid <- moca %>% 
-  select(phone_eligible_consent:phone_more_info)
+# Call log contains all the information about each call made
+# First, add all the phone recruitment data
+call_log %>% 
+  lleft_join()
+
 
 ## Save locally
 readr::write_csv(moca_deid, "data/moca_deid.csv")
