@@ -1,0 +1,21 @@
+---
+title: "Recruiting metrics"
+---
+
+```{r message=FALSE}
+library(dplyr)
+library(readr)
+```
+
+
+The merged data used below was created in data_01_import.Rmd.
+
+```{r}
+merged_followup <- read_rds("/Users/bradcannell/Desktop/merged_followup.rds")
+```
+
+Left off here...
+
+I probably want to get some idea of what the metrics, graphs, etc look like outside of Shiny. I can use this file for that purpose. I can also refer to index.Rmd from the static dashboard. 
+
+I may also want to get a handle on some basic Shiny functionality (e.g., filtering data on date) while I'm working on this process. That will take place in app.R.
