@@ -335,14 +335,14 @@ merged_phone_recruitment <- merged_phone_recruitment %>%
 
 ### Check MedStar IDs
 
-How many MedStar IDs are in consent, but not the merged_phone_recruitment? There is actually one MedStar ID (01e9b) that exists in the consent data, but not the merged_phone_recruitment data. I did a check on FileMaker Pro. It looks like this person does have a completed F/U interview, but no phone screening data. I emailed Sunil to see if he had and insight. In the meantime, I'm going to set the data check to allow for one MedStar ID that exists in the consent data, but not the merged_phone_recruitment data, and throw an error otherwise.
+How many MedStar IDs are in consent, but not the merged_phone_recruitment?
 
 ```{r}
 # Data check
 test_that("Make sure there is only one MedStar ID that appears in consent, but not merged_phone_recruitment.", {
   con_ids  <- consent_sub$medstar_id
   mpr_ids <- merged_phone_recruitment$medstar_id
-  expect_equal(length(setdiff(con_ids, mpr_ids)), 1)
+  expect_equal(length(setdiff(con_ids, mpr_ids)), 0)
 })
 ```
 
@@ -417,19 +417,17 @@ merged_followup <- merged_followup %>%
   left_join(gift_card_sub, by = c("medstar_id", "last_row"))
 ```
 
-
-
-
-
-
+```{r}
+# For testing only
+# write_rds(merged_followup, "/Users/bradcannell/Desktop/merged_followup.rds")
+```
 
 
 Left off here... 
 
+I still need to merge in the follow-up interview data and the initial DETECT screening data. There was a problem with the initial DETECT screening data. Some of the MedStar ID's were showing up more than once. I emailed Brandon on 2020-09-11 about this. They are looking into it. In the meantime, I think I can go ahead and work on developing the dashboard for the recruiting metrics.
 
-Merge consent, gift_card, detect
 
-Need to make sure I have all the variables I need from gift card data. Also, need to get on VPN for the DETECT data.
 
 
 
@@ -478,55 +476,14 @@ Need to make sure I have all the variables I need from gift card data. Also, nee
 
 
 
-## Save record of data manipulation
 
-I'm not sure it makes sense to save this to an external file when using Shiny. Maybe it can be part of a quality control tab or something. We will save the results of these operations for tracking data quality over time.
 
-```{r}
-# Create it the first time then update it after
-if(file.exists("merge_conflicts.csv")) {
-  merge_conflicts <- read_csv("merge_conflicts.csv")
-} else {
-  merge_conflicts <- tibble(
-    date = Sys.Date()
-  )
-  # Save to be updated in the future
-  write_csv(merge_conflicts, "merge_conflicts.csv")
-}
-```
 
-```{r}
-merge_conflicts_new <- tibble(
-  date = Sys.Date(),
-  conflicts = 232
-)
-```
 
-```{r}
-merge_conflicts <- merge_conflicts %>% bind_rows(merge_conflicts_new)
-```
 
-```{r}
-write_csv(merge_conflicts, "merge_conflicts.csv")
-```
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-* Convert timestamps to POSIXct class (combine like commands across data frames later)
 
