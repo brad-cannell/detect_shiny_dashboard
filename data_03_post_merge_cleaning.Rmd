@@ -1,0 +1,95 @@
+---
+title: "Post merge data cleaning"
+---
+
+# Post-merge data wrangling
+
+## Wrangle dates and times
+
+What to do about the MedStar Id's with a record in phone_recruitment, but not the call_log? 
+
+In the cases below, all the values for x_created_timestamp_cl are NA because x_created_timestamp_cl comes from the call log. However, when we checked records that do have a value for both, the difference between when the record was open (x_created_timestamp_pr) and when the last call call was made (x_created_timestamp_cl when we merge on last_row) can be many days apart. However, for all of these cases, presumably only one call was ever made (i.e., the call that resulted in a record in phone_recruitment). Therefore, we will create an new call_timestamp variable that is equal to x_created_timestamp_cl when available and equal to x_created_timestamp_pr otherwise. Also, this is such a small proportion of records that whatever slight errors are introduced by this procedure should not have a large impact on conclusions.
+
+```{r}
+# Data checks
+# merged_followup %>% 
+#   filter(is.na(x_created_timestamp_cl))
+```
+
+```{r}
+merged_followup <- merged_followup %>% 
+  mutate(
+    call_timestamp = if_else(
+      is.na(x_created_timestamp_cl), x_created_timestamp_pr, x_created_timestamp_cl
+    )
+  )
+```
+
+Create factor labels that I can use multiple times below.
+
+```{r}
+hours_f <- c("00-00:59", "01-01:59", "02-02:59", "03-03:59", "04-04:59", "05-05:59", 
+             "06-06:59", "07-07:59", "08-08:59", "09-09:59", "10-10:59", "11-11:59", 
+             "12-12:59", "13-13:59", "14-14:59", "15-15:59", "16-16:59", "17-17:59", 
+             "18-18:59", "19-19:59", "20-20:59", "21-21:59", "22-22:59", "23-23:59")
+
+days_f <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+```
+
+Add call dates, days, months, and times
+
+```{r}
+merged_followup <- merged_followup %>% 
+  mutate(
+    call_date   = as.Date(call_timestamp),
+    call_time   = hms::as_hms(call_timestamp),
+    call_hour   = lubridate::hour(call_time),
+    call_hour_f = factor(call_hour, 0:23, hours_f),
+    call_day    = weekdays(call_date),
+    call_day    = forcats::fct_relevel(call_day, days_f),
+    call_month  = lubridate::month(call_date),
+    call_month  = factor(call_month, 1:12, month.name),
+    call_year   = lubridate::year(call_date)
+  )
+```
+
+```{r}
+# Check call hours - because we sometimes have problems with this
+test_that("Make sure there aren't calls made outside of expected times of the day.", {
+  call_hours_in_df <- sort(unique(merged_followup$call_hour))
+  call_hours_expected <- c(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)
+  expect_equal(call_hours_in_df, call_hours_expected)
+})
+```
+
+
+Left off here...
+
+
+Add appointment days, months, and times. Also, add a scheduled tag.
+
+```{r}
+merged_followup %>% 
+  filter(!is.na(appointment_date)) %>% 
+  select(starts_with("appoint")) %>% 
+  mutate(
+    appointment_hour  = lubridate::hour(appointment_time),
+    # appointment_hour_f = factor(appointment_hour, labels = c(
+    #   "08-08:59", "09-09:59", "10-10:59", "11-11:59", "12-12:59", "13-13:59", 
+    #   "14-14:59", "15-15:59", "16-16:59", "17-17:59", "18-18:59", "19-19:59")),
+    appointment_day   = weekdays(appointment_date),
+    appointment_day   = forcats::fct_relevel(appointment_day, 
+      ),
+    appointment_month = lubridate::month(appointment_date),
+    appointment_month = factor(appointment_month, 1:12, month.name),
+    appointment_year  = lubridate::year(appointment_date)
+  ) %>% 
+  count(appointment_hour)
+```
+
+
+
+```{r}
+# For testing only
+# write_rds(merged_followup, "/Users/bradcannell/Desktop/merged_followup.rds")
+```
