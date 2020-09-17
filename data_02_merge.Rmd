@@ -14,6 +14,11 @@ library(testthat)
 
 We imported the various data tables from FM Pro in data_01_import.Rmd. In this file, we will merge them togther.
 
+```{r}
+# knitr::knit("data_01_import.Rmd")
+```
+
+
 # Current data tables
 
 ## ParticipantCallLog 
@@ -74,20 +79,23 @@ walk(
 ## Keep only the columns needed from each data frame
 
 ```{r}
-# Columns to keep in every data frame
-start_cols <- c("medstar_id", "x_created_timestamp", "x_created_by", 
-                   "x_modified_timestamp", "x_modified_by", "name_full")
-```
-
-```{r}
 participant_call_log_sub <- participant_call_log %>% 
-  select(all_of(start_cols), response, notes, response_recode, answered_by)
+  select(
+    medstar_id, x_created_timestamp, x_created_by, name_full, response, notes, 
+    response_recode, answered_by
+  )
 ```
 
 ```{r}
 phone_recruitment_sub <- phone_recruitment %>% 
-  select(all_of(start_cols), x_record_status, phone_initial_request:x_moca_orientation_date,
-         x_record_comment, phone_more_info, phone_alzheimer_follow_up)
+  select(
+    # We need to keep timestamp, created_by, and record status because we will
+    # see below that there are some rows in this data that don't have a match
+    # in the call log data (above).
+    medstar_id, x_created_timestamp, x_created_by, x_record_status, 
+    phone_initial_request:x_moca_orientation_date, x_record_comment, 
+    phone_more_info, phone_alzheimer_follow_up
+  )
 ```
 
 ```{r}
@@ -102,23 +110,29 @@ consent_sub <- consent %>%
   # After some trial and error below, these are the only columns we need from
   # this data frame.
   select(
-    medstar_id, conset_created_by = x_created_by, 
-    consent_timestamp = x_created_timestamp, censent_status = x_record_status
+    medstar_id, consent_created_by = x_created_by, 
+    consent_timestamp = x_created_timestamp, consent_status = x_record_status
   )
 ```
 
+There were 3 MedStar IDs (as of 2020-09-23) that had a value of "Incomplete" for gift_card_status. I did a manual check in FM Pro. All three got a gift card, the medic just forgot to change the status to "Gift Card Distributed." I changed them. I'm going build a check for that.
+
+```{r}
+# Data check - No Incomplete gift card status
+test_that("Make sure gift card status is not Incomplete", {
+  status <- unique(gift_card$x_record_status)
+  expect_equal(status, "Gift Card Distributed")
+})
+```
 
 ```{r}
 # A bunch of the follow-up interview questions are in the gift card data. I'm dropping them for now, but I may want to add them back in later.
 gift_card_sub <- gift_card %>% 
-  select(medstar_id, gift_card_status = x_record_status)
+  select(
+    medstar_id, gift_card_status = x_record_status, 
+    gift_card_timestamp = x_created_timestamp
+  )
 ```
-
-```{r}
-rm(start_cols)
-```
-
-
 
 
 # Merge the data frames together
@@ -411,6 +425,11 @@ gift_card_sub <- gift_card_sub %>%
 ```{r}
 merged_followup <- merged_followup %>% 
   left_join(gift_card_sub, by = c("medstar_id", "last_call_by_id" = "last_row"))
+```
+
+```{r}
+# For testing only
+# write_rds(merged_followup, "/Users/bradcannell/Desktop/merged_followup.rds")
 ```
 
 Left off here... 

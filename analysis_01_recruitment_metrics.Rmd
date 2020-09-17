@@ -5,15 +5,15 @@ title: "Recruiting metrics"
 ```{r message=FALSE}
 library(dplyr)
 library(readr)
+library(tidyr)
 ```
 
 The merged data used below was created in data_01_import.Rmd.
 
 ```{r}
-merged_followup <- read_rds("/Users/bradcannell/Desktop/merged_followup.rds")
+# For testing only
+# merged_followup <- read_rds("/Users/bradcannell/Desktop/merged_followup.rds")
 ```
-
-Left off here...
 
 I probably want to get some idea of what the metrics, graphs, etc look like outside of Shiny. I can use this file for that purpose. I can also refer to index.Rmd from the static dashboard. 
 
@@ -45,6 +45,8 @@ The total interviews completed
 
 * No observational data
 
+* Appointment date, but record status is not Participant Scheduled.
+
 # Tab: Outbound calls
 
 ## Total calls made
@@ -55,26 +57,100 @@ Each row in the data should represent a single call. It isn't perfect. We know t
 nrow(merged_followup)
 ```
 
+## Calls made per day
+
+Create a function that I can use to count calls made and appointments scheduled (and possibly other metrics in the future) by day.
+
 ```{r}
-# Calculate summary statistics about calls made that will be used in the charts below
-calls_per_day <- 
-  merged_followup %>%
-  count(call_date) %>% 
-  # Fill-in missing days with zero
-  complete(call_date = seq(call_date[1], Sys.Date(), by = "1 day"), fill = list(n = 0)) %>% 
-  # Add cumulative calls 
-  mutate(cumulative_n = cumsum(n)) %>% 
-  # Add call day variable
-  mutate(
-    day = weekdays(call_date),
-    day = forcats::fct_relevel(day, "Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
-  ) %>% 
-  # Improve plot readability
-  rename(
-    Date = call_date,
-    Day = day
-  )
+count_per_day <- function(data, var) {
+  data %>%
+    count({{ var }}) %>% 
+    # Fill-in missing days with zero
+    complete(
+      {{ var }} := seq({{ var }}[1], Sys.Date(), by = "1 day"), 
+      fill = list(n = 0)
+    ) %>% 
+    # Add cumulative sum
+    mutate(cumulative_n = cumsum(n)) %>%
+    # Add call day variable
+    mutate(
+      day = weekdays({{ var }}),
+      day = forcats::fct_relevel(
+        day, "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
+      )
+    ) %>%
+    # Improve plot readability
+    rename(
+      Date = call_date,
+      Day = day
+    )
+}
+
+# For testing
+# count_per_day(merged_followup, call_date)
 ```
+
+```{r}
+calls_per_day <- count_per_day(merged_followup, call_date)
+```
+
+## Appointments scheduled per day
+
+```{r}
+scheduled_per_day <- merged_followup %>% 
+  # First, just grab rows that were scheduled
+  filter(scheduled == TRUE) %>% 
+  # Count the day the call was made, not the appointment date. We care about 
+  # how many F/U's were scheduled (call_date), not how many were conducted
+  # (appointment_date)
+  count_per_day(call_date)
+```
+
+
+## Calls made per month
+
+* Can't just count calls by month because months will be combined across years.
+* Can't just paste month and year together because they will be displayed in alphabetical order rather than chronologic order.
+* Need to create a factor for year and month.
+
+```{r}
+aggregate_to_month <- function(data) {
+  # For year_month factor variable below
+  years <- seq.Date(as.Date("2019-08-01"), Sys.Date(), by = "year")
+  years <- lubridate::year(years)
+  month_years <- paste(rep(years, each = 12), month.name)
+  
+  data %>% 
+    # Separate call year and month into two columns
+    mutate(
+      year  = lubridate::year(Date),
+      month = lubridate::month(Date)
+    ) %>%
+    group_by(year, month) %>% 
+    summarise(n = sum(n), .groups = "drop") %>% 
+    # Improve plot readability
+    mutate(
+      month_name   = factor(month, 1:12, month.name),
+      year_month   = paste(year, month_name),
+      year_month_f = factor(year_month, month_years, month_years)
+    ) 
+}
+
+# For testing
+# aggregate_to_month(calls_per_day)
+```
+
+```{r}
+calls_per_month <- aggregate_to_month(calls_per_day)
+```
+
+## Appointments scheduled per month
+
+```{r}
+scheduled_per_month <- aggregate_to_month(scheduled_per_day)
+```
+
+## Plot called and scheduled
 
 ```{r}
 calls_per_day_plot <- calls_per_day_w_scheduled %>% 
@@ -134,9 +210,13 @@ merged_followup %>%
 
 ```{r}
 merged_followup %>% 
-  count(answered_by)
+  # count(answered_by)
   # For data checking
-  # filter(is.na(answered_by))
+  filter(is.na(answered_by)) %>% 
+  distinct(medstar_id) %>% 
+  mutate(medstar_id_last_5 = str_extract(medstar_id, ".{5}$")) %>% 
+  select(-medstar_id) %>% 
+  write_csv("/Users/bradcannell/Desktop/no_answer_by.csv")
 ```
 
 
@@ -156,9 +236,11 @@ merged_followup %>%
 
 ## Answered by
 
+We have 163 answered 
+
 ```{r}
 merged_followup %>% 
-  count() %>% 
+  count(answered_by) %>% 
   arrange(desc(n)) %>% 
   mutate(percent = round((n / sum(n) * 100), 1))
   # For data checking
