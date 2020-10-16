@@ -1,0 +1,189 @@
+---
+title: "Remove duplicate rows (by MedStar ID) from EPCR Data"
+date: "2020-10-14"
+---
+
+# Background
+
+For some reason, the patient data we were initially downloading from [MedStar's FTP Server](https://sftp.medstar911.org/login.html) did not include the initial DETECT screenings. We weren't doing anything with the initial DETECT screenings at first, so it took a little while to figure out that the initial screenings weren't there. 
+
+We requested that the initial DETECT screenings be included in the data going forward. MedStar also uploaded the initial DETECT screenings for all records on the FTP server going back to 2019-07-01. 
+
+On 2020-09-10 Sunil tried to import the initial DETECT screenings into FM Pro, but ran into an error. The error was caused by duplicated MedStar IDs (Incident_Patient_Care_Report_Number). Further, he noticed that the initial DETECT screening responses by row within MedStar ID.
+
+On 2020-10-05 MedStar uploaded an updated data set to the FTP Server. There are still multiple MedStar IDs in some cases, however. After several conversations with MedStar, here is what we figured out about the multiple IDs.
+
+From Desiree:
+
+"Some more feedback on this…
+ 
+I reached out to both crews for these two incidents in September.
+ 
+The crew for the record ending in 51c91 emphasized that they had ran the patient twice. The first worksheet at 0724 was initially created by the paramedic during the preliminary encounter, however, the second worksheet at 0820 was created by his partner as she was the one who ultimately assessed, treated and transferred the patient over to hospital staff so she had the most accurate encounter. She also reported that she put the APS report information in that worksheet.
+ 
+Regarding the record ending in 9c294, I spoke to the crew member who ran the patient. She stated that the worksheet was started at the end of the call and she thinks that the computer timed out which prompted her to do another worksheet. She also emphasized that the APS report information was included in her worksheet and therefore that one should be the most accurate.
+ 
+To Ricky’s point, it appears as though there are a couple of reasons as to why 2 worksheets are created. From what I gather from these two incidents, the second form is the accurate one."
+
+# Decision
+
+After further discussion we decided that it seem like a reasonable assumption to make that the medics typically only create a second worksheet in order to make it more accurate (or complete it). Therefore, whenever there are two worksheets with conflicting information, we should keep the second one.
+
+# Load packages
+
+```{r}
+library(dplyr, warn.conflicts = FALSE)
+library(readxl)
+library(stringr)
+library(readr)
+library(lubridate, warn.conflicts = FALSE)
+```
+
+# Load data
+
+```{r}
+# Import the 2019-07-01 to 2020-09-30 data
+df_w_dups <- read_excel(
+  "/Users/bradcannell/Desktop/Detect Report.xlsx",
+  na = c("", " ", "NULL")
+)
+```
+
+# Initial data cleaning
+
+Convert variable names to lowercase
+Also, fill in spaces with underscores
+
+```{r}
+names(df_w_dups) <- str_to_lower(names(df_w_dups))
+names(df_w_dups) <- str_replace_all(names(df_w_dups), " ", "_")
+```
+
+# Keep variables of interest
+
+```{r}
+df_w_dups <- df_w_dups %>% 
+  select(
+    dim_incident___incident_patient_care_report_number,
+    dim_incident___incident_date_time,
+    `unusual_odors_(e.g._urine,_feces)_that_are_unrelated_to_current_medical_conditions`:`does_the_older_adult_appear_depressed,anxious_or_emotionally_distressed_for_reasons_other_than_their_immediate_medical_condition`, 
+    dim_incidentws___worksheet_date_time, 
+    dim_incidentws___worksheet_instance_crew_member
+  )
+```
+
+# Check for duplicate MedStar IDs
+
+Probably won't need to do it this way in the future. Just trying to get caught up with all the old data.
+
+```{r}
+dups_by_year_month <- df_w_dups %>% 
+  group_by(dim_incident___incident_patient_care_report_number) %>% 
+  arrange(dim_incidentws___worksheet_date_time) %>% 
+  mutate(
+    row = row_number(),
+    n_rows = max(row)
+  ) %>% 
+  filter(n_rows > 1) %>% 
+  ungroup() %>% 
+  
+  # In order to view by year and month
+  mutate(
+    year = year(dim_incident___incident_date_time),
+    month = month(dim_incident___incident_date_time)
+  ) %>% 
+  filter(row == 1) %>% 
+  count(year, month)
+```
+
+# Save number of duplicates for record keeping
+
+Created a csv file to store various quality control metrics over time. In this case, I want to keep a count of the duplicate MedStar IDs by year and month. We will update this each month before adding the MedStar patient data to FM Pro.
+
+Actually, once this is all in FM Pro, the process may change. Oh well, do it this way for now.
+
+```{r}
+qc <- read_csv(
+  "data/dup_medstar_ids",
+  col_types = "ddd"
+)
+```
+
+```{r}
+qc <- qc %>% 
+  bind_rows(
+    dups_by_year_month %>% 
+      rename(count = n)
+  )
+```
+
+```{r}
+write_csv(qc, "data/dup_medstar_ids")
+```
+
+# Remove duplicate rows
+
+```{r}
+df_w_dups <- df_w_dups %>% 
+  group_by(dim_incident___incident_patient_care_report_number) %>% 
+  arrange(dim_incidentws___worksheet_date_time) %>% 
+  mutate(row = row_number()) %>% 
+  filter(row == 1) %>% 
+  select(-dim_incident___incident_date_time, -row) %>% 
+  ungroup()
+  
+  # For data checking
+  # arrange(
+  #   dim_incident___incident_patient_care_report_number,
+  #   dim_incidentws___worksheet_date_time
+  # ) %>% 
+  # filter(max(row) > 1)
+```
+
+
+# Export for FM Pro
+
+```{r}
+write_csv(
+  df_w_dups, 
+  "/Users/bradcannell/Desktop/detect_initial_screenings_2019_07_01_2020_09_30.csv",
+  na = ""
+)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
