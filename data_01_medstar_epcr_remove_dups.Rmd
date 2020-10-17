@@ -32,11 +32,11 @@ After further discussion we decided that it seem like a reasonable assumption to
 # Load packages
 
 ```{r}
-library(dplyr, warn.conflicts = FALSE)
+library(dplyr)
 library(readxl)
 library(stringr)
 library(readr)
-library(lubridate, warn.conflicts = FALSE)
+library(lubridate)
 ```
 
 # Load data
@@ -66,9 +66,7 @@ df_w_dups <- df_w_dups %>%
   select(
     dim_incident___incident_patient_care_report_number,
     dim_incident___incident_date_time,
-    `unusual_odors_(e.g._urine,_feces)_that_are_unrelated_to_current_medical_conditions`:`does_the_older_adult_appear_depressed,anxious_or_emotionally_distressed_for_reasons_other_than_their_immediate_medical_condition`, 
-    dim_incidentws___worksheet_date_time, 
-    dim_incidentws___worksheet_instance_crew_member
+    `unusual_odors_(e.g._urine,_feces)_that_are_unrelated_to_current_medical_conditions`:dim_incidentws___worksheet_instance_crew_member
   )
 ```
 
@@ -103,22 +101,22 @@ Created a csv file to store various quality control metrics over time. In this c
 Actually, once this is all in FM Pro, the process may change. Oh well, do it this way for now.
 
 ```{r}
-qc <- read_csv(
-  "data/dup_medstar_ids",
-  col_types = "ddd"
-)
+# qc <- read_csv(
+#   "data/dup_medstar_ids.csv",
+#   col_types = "ddd"
+# )
 ```
 
 ```{r}
-qc <- qc %>% 
-  bind_rows(
-    dups_by_year_month %>% 
-      rename(count = n)
-  )
+# qc <- qc %>% 
+#   bind_rows(
+#     dups_by_year_month %>% 
+#       rename(count = n)
+#   )
 ```
 
 ```{r}
-write_csv(qc, "data/dup_medstar_ids")
+# write_csv(qc, "data/dup_medstar_ids")
 ```
 
 # Remove duplicate rows

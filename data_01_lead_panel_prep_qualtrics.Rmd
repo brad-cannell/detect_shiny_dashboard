@@ -1,0 +1,168 @@
+---
+title: "Prep LEAD Panel votes from Qualtrics to be added to FM Pro"
+date: "2020-10-16"
+---
+
+On 2020-02-26 we began doing the LEAD panel reviews directly in FM Pro. Prior to that, we were doing them in Qualtrics. In this file, we prepare the old Qualtrics data to be uploaded into FM Pro.
+
+```{r}
+library(dplyr, warn.conflicts = FALSE)
+library(haven)
+library(lubridate)
+```
+
+# Import Qualtrics data
+
+```{r}
+lead <- read_spss("/Users/bradcannell/Desktop/DETECT+Lead+Panel+Assessment_October+16,+2020_14.43.sav")
+```
+
+# Align column names
+
+Select columns that will be uploaded to FM Pro and change names to match the FM Pro names
+
+```{r}
+lead <- lead %>% 
+  select(
+    xCreatedTimestamp = StartDate, xModifiedTimestamp = RecordedDate,
+    CaseID = MedstarID, AssessmentType, PhysicalAbuse = Physical,
+    SexualAbuse = Sexual, EmotionalPsychoAbuse = Emotional,
+    Neglect, Abandonment, FinancialExploitation = Financial,
+    SelfNeglect, Comments,
+    
+    # Also need these for further data cleaning and computed variables
+    IPAddress, RecipientLastName, RecipientFirstName
+  )
+```
+
+# Drop empty rows
+
+There are 3 rows that are missing all the way across. Go ahead and drop them.
+
+```{r}
+lead <- lead %>% 
+  filter(!CaseID == "")
+```
+
+# Create xAssessmentMonth and xAssessmentYear
+
+These are the year and month before the LEAD Panel meeting. For example, if the LEAD panel was in February 2020, then the xAssessmentMonth and xAssessmentYear would be January 2020. So, it's the month the cases we are assessing are from.
+
+```{r}
+lead <- lead %>% 
+  mutate(
+    back_1 = xCreatedTimestamp - months(1),
+    xAssessmentMonth = factor(month(back_1), 1:12, month.name),
+    xAssessmentYear = year(back_1)
+  ) %>% 
+  select(-back_1)
+```
+
+# Fill-in missing LEAD Panel member names
+
+There are some rows that are missing the name of the panelist. This was caused by an error in the code we used in Qualtrics to have them go back to the beginning of the survey and fill it out for the next case. However, we can impute the LEAD panel member name by matching their name and IP address from other rows.
+
+```{r}
+lead <- lead %>% 
+  mutate(
+    across(
+      .cols = c(RecipientLastName, RecipientFirstName),
+      .fns = ~ if_else(.x == "", NA_character_, .x)
+    )
+  ) %>% 
+  group_by(IPAddress, xAssessmentMonth) %>% 
+  tidyr::fill(RecipientLastName, RecipientFirstName) %>% 
+  ungroup() %>% 
+  select(-IPAddress)
+```
+
+# Create PanelistName, xUsername, xCreatedBy, and xModifiedBy columns
+
+```{r}
+lead <- lead %>% 
+  mutate(
+    PanelistName = paste(RecipientFirstName, RecipientLastName, sep = " "),
+    xUsername = case_when(
+      RecipientLastName == "Rolfe" ~ "jrolfe",
+      RecipientLastName == "Knebl" ~ "jknebl",
+      RecipientLastName == "Reuter" ~ "kreuter",
+      RecipientLastName == "Burnett" ~ "uthouston\\jburnett",
+      RecipientLastName == "Large" ~ "slarge",
+      RecipientLastName == "Fant" ~ "safant",
+    ),
+    xCreatedBy = xUsername,
+    xModifiedBy = xUsername
+  ) %>% 
+  select(-RecipientFirstName, -RecipientLastName)
+```
+
+# Add value labels to AssessmentType
+
+```{r}
+lead <- lead %>% 
+  mutate(
+    AssessmentType = case_when(
+      AssessmentType == 1 ~ "Initial assessment",
+      AssessmentType == 2 ~ "Secondary assessment"
+    )
+  )
+```
+
+# Create xcAssessmentScreened column
+
+Did a manual check, there were no missing values in any of the abuse type questions.
+
+```{r}
+lead <- lead %>% 
+  rowwise() %>% 
+  mutate(
+    xcAssessmentScreened = sum(
+      PhysicalAbuse, SexualAbuse, EmotionalPsychoAbuse, Neglect, Abandonment,
+      FinancialExploitation, SelfNeglect
+    ) > 0,
+    xcAssessmentScreened = if_else(
+      xcAssessmentScreened == TRUE,
+      "Positive", "Negative"
+    )
+  )
+```
+
+# Add value labels to abuse columns
+
+```{r}
+lead <- lead %>% 
+  mutate(
+    across(
+      .cols = PhysicalAbuse:SelfNeglect,
+      .fns = ~ case_when(
+        .x == 0 ~ "No",
+        .x == 1 ~ "Yes"
+      )
+    )
+  )
+```
+
+# Reorder variables to match FM Pro
+
+```{r}
+lead <- lead %>% 
+  select(
+    xCreatedBy, xCreatedTimestamp, xModifiedBy, xModifiedTimestamp, 
+    PanelistName, xUsername, CaseID, AssessmentType, PhysicalAbuse:Comments,
+    xcAssessmentScreened, xAssessmentMonth, xAssessmentYear
+  )
+```
+
+Left off here. Make sure there aren't two initial assessments or two secondary assessments for any CaseID and xUsername.
+
+Also, are the duplicates or did they accidently select Initial assessment when they mean to select secondary assessment?
+
+```{r}
+lead %>% 
+  group_by(CaseID, xUsername, AssessmentType) %>% 
+  mutate(row = row_number()) %>% 
+  filter(max(row) > 1)
+```
+
+
+
