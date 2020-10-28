@@ -6,6 +6,7 @@ title: "Recruiting metrics"
 library(dplyr)
 library(readr)
 library(tidyr)
+library(ggplot2)
 ```
 
 The merged data used below was created in data_01_import.Rmd.
@@ -106,11 +107,26 @@ scheduled_per_day <- merged_followup %>%
   count_per_day(call_date)
 ```
 
+```{r}
+calls_per_day_w_scheduled <- calls_per_day %>%
+  left_join(
+    scheduled_per_day, 
+    by = c("Date", "Day"),
+    suffix = c("_calls", "_scheduled")
+  ) %>% 
+  # Change NA in first row of scheduled to 0
+  mutate(
+    across(
+      n_scheduled:cumulative_n_scheduled,
+      replace_na, 0
+    )
+  )
+```
 
 ## Calls made per month
 
 * Can't just count calls by month because months will be combined across years.
-* Can't just paste month and year together because they will be displayed in alphabetical order rather than chronologic order.
+* Can't just paste month and year together because they will be displayed in alphabetical order rather than chronological order.
 * Need to create a factor for year and month.
 
 ```{r}
@@ -150,30 +166,75 @@ calls_per_month <- aggregate_to_month(calls_per_day)
 scheduled_per_month <- aggregate_to_month(scheduled_per_day)
 ```
 
+```{r}
+calls_per_month_w_scheduled <- calls_per_month %>%
+  left_join(
+    scheduled_per_month %>% 
+      select(year, month, n),
+    by = c("year", "month"),
+    suffix = c("_calls", "_scheduled")
+  )
+```
+
 ## Plot called and scheduled
 
+Also, create a factor version of scheduled per day for the plot below (Plot called and scheduled).
+
 ```{r}
-calls_per_day_plot <- calls_per_day_w_scheduled %>% 
-  ggplot(aes(Date, `N called`)) +
+calls_per_day_w_scheduled <- calls_per_day_w_scheduled %>% 
+  mutate(
+    n_scheduled_f = case_when(
+      is.na(n_scheduled) ~ NA_character_,
+      n_scheduled == 0   ~ "0",
+      n_scheduled == 1   ~ "1",
+      n_scheduled == 2   ~ "2",
+      n_scheduled == 3   ~ "3",
+      n_scheduled == 4   ~ "4",
+      TRUE               ~ "5+"
+    ) %>% 
+      factor()
+  )
+```
+
+Export data for experimenting with Shiny.
+
+```{r}
+write_rds(
+  calls_per_day_w_scheduled, 
+  "/Users/bradcannell/Desktop/calls_per_day_w_scheduled.rds"
+)
+```
+
+```{r}
+calls_per_day_plot <- ggplot(calls_per_day_w_scheduled, aes(Date, n_calls)) +
   geom_line(color = "#8a8a8a") +
-  geom_point(aes(color = `N Scheduled`)) +
-  scale_x_date("Date", date_label = "%b-%d", 
-    # Make sure the x-axis includes the earliest date and today with other breakes
-    # coming at 1 week intervals.
-    breaks = seq(min(calls_per_day_w_scheduled$Date), Sys.Date(), "weeks")
-  ) +
+  geom_point(aes(color = n_scheduled_f)) +
+  scale_x_date("Date", date_label = "%b-%y") +
   scale_y_continuous("Number of Calls") +
   scale_color_manual(
-    "F/U Scheduled", 
-    values = c("#a60303", "#6AA2E7", "#03a606"),
+    "F/U Scheduled",
+    values = c("#8a8a8a", "#F2E750", "#F2B807", "#F28705", "#C52104", "#a60303"),
     drop = FALSE
   ) +
-  theme_bw() +
+  theme_classic() +
   theme(legend.title = element_text(size = 8))
 
 plotly::ggplotly(calls_per_day_plot)
 ```
 
+Correlation between calls made and scheduled?
+
+```{r}
+cor.test(
+  calls_per_day_w_scheduled$n_calls, 
+  calls_per_day_w_scheduled$n_scheduled
+)
+```
+```{r}
+test <- calls_per_day_w_scheduled %>% 
+  mutate(n_calls_rescale = n_calls / 40)
+lm(n_scheduled ~ n_calls_rescale, data = test)
+```
 
 ## Unique MedStar IDs
 
