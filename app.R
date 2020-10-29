@@ -32,8 +32,6 @@ library(plotly)
 # code and how best to run it when I refresh the data.
 calls_per_day_w_scheduled <- read_rds("/Users/bradcannell/Desktop/calls_per_day_w_scheduled.rds")
 
-
-
 # =============================================================================
 # Create the UI
 # =============================================================================
