@@ -32,21 +32,22 @@ After further discussion we decided that it seem like a reasonable assumption to
 # Load packages
 
 ```{r}
-library(dplyr, warn.conflicts = FALSE)
+library(dplyr)
 library(readxl)
+library(readr)
 library(stringr)
 library(readr)
-library(lubridate, warn.conflicts = FALSE)
+library(lubridate)
 ```
 
 # Load data
 
 ```{r}
 # Import the 2019-07-01 to 2020-09-30 data
-df_w_dups <- read_excel(
-  "/Users/bradcannell/Desktop/Detect Report.xlsx",
-  na = c("", " ", "NULL")
-)
+# df_w_dups <- read_excel(
+#   "/Users/bradcannell/Desktop/Detect Report.xlsx",
+#   na = c("", " ", "NULL")
+# )
 ```
 
 # Initial data cleaning
@@ -150,6 +151,32 @@ write_csv(
   na = ""
 )
 ```
+
+
+
+
+# Check monthly data downloads from MedStar FTP server for duplicate MedStar IDs
+
+```{r}
+# November data - need to figure out a better way eventually.
+# Don't have time today.
+# Save as Excel file first.
+df_w_dups <- read_excel(
+  "/Users/bradcannell/Desktop/Detect Report-2020_11_01_070011.xlsx",
+  na = c("", " ", "NULL")
+)
+```
+
+```{r eval=FALSE}
+df_w_dups %>% 
+  group_by(Incident_Patient_Care_Report_Number) %>% 
+  mutate(
+    row = row_number()
+  ) %>% 
+  filter(max(row) > 1)
+```
+
+2020-11: There was one MedStar ID that had two rows. They were identical aside from the fact that one had an APS report number. We will keep that row. I'm making the change directly in the spreadsheet.
 
 
 
