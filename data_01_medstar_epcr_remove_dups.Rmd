@@ -25,9 +25,12 @@ Regarding the record ending in 9c294, I spoke to the crew member who ran the pat
  
 To Ricky’s point, it appears as though there are a couple of reasons as to why 2 worksheets are created. From what I gather from these two incidents, the second form is the accurate one."
 
+**Update 2020-12-11:**
+* Nitin started adding "worksheet_instance_crew_member" and "worksheet_date_time" to the regular data uploads that MedStar sends to the FTP server. Duplicates by MedStar ID instantly went up from 1 or 2 per month to 562 in December. I don't think this reflects changing conditions on the ground. This is primarily due to differences in worksheet timestamp only. Not differences to substantive values. 
+
 # Decision
 
-After further discussion we decided that it seem like a reasonable assumption to make that the medics typically only create a second worksheet in order to make it more accurate (or complete it). Therefore, whenever there are two worksheets with conflicting information, we should keep the second one.
+After further discussion we decided that it seem like a reasonable assumption to make that the medics typically only create a second worksheet in order to make it more accurate (or complete it). Therefore, whenever there are two worksheets with conflicting information, we should keep the second one. The exception is when only the first row contains an APS report number. In that case, we will keep the row with the APS report number because 1.) We can use later in data quality checks (i.e., to merge with APS data), and 2.) it is the presumably the screening responses that prompted the medic to report to APS.
 
 # Load packages
 
@@ -42,12 +45,21 @@ library(lubridate)
 
 # Load data
 
+Convert csv file to excel file outside of R.
+
 ```{r}
-# Import the 2019-07-01 to 2020-09-30 data
-# df_w_dups <- read_excel(
-#   "/Users/bradcannell/Desktop/Detect Report.xlsx",
-#   na = c("", " ", "NULL")
-# )
+df_w_dups <- read_excel(
+  "/Users/bradcannell/Desktop/Detect Report-2020_12_15_113210.xlsx",
+  na = c("", " ", "NULL")
+)
+```
+
+Take an initial look to see how many duplicate MedStar ID's there are.
+
+```{r}
+df_w_dups %>% 
+  count(Incident_Patient_Care_Report_Number) %>% 
+  filter(n > 1)
 ```
 
 # Initial data cleaning
@@ -60,39 +72,31 @@ names(df_w_dups) <- str_to_lower(names(df_w_dups))
 names(df_w_dups) <- str_replace_all(names(df_w_dups), " ", "_")
 ```
 
-# Keep variables of interest
+# Add within group row number
 
 ```{r}
-df_w_dups <- df_w_dups %>% 
-  select(
-    dim_incident___incident_patient_care_report_number,
-    dim_incident___incident_date_time,
-    `unusual_odors_(e.g._urine,_feces)_that_are_unrelated_to_current_medical_conditions`:`does_the_older_adult_appear_depressed,anxious_or_emotionally_distressed_for_reasons_other_than_their_immediate_medical_condition`, 
-    dim_incidentws___worksheet_date_time, 
-    dim_incidentws___worksheet_instance_crew_member
-  )
-```
-
-# Check for duplicate MedStar IDs
-
-Probably won't need to do it this way in the future. Just trying to get caught up with all the old data.
-
-```{r}
-dups_by_year_month <- df_w_dups %>% 
-  group_by(dim_incident___incident_patient_care_report_number) %>% 
-  arrange(dim_incidentws___worksheet_date_time) %>% 
+df_w_dups <- df_w_dups %>%
+  group_by(incident_patient_care_report_number) %>% 
+  arrange(worksheet_date_time) %>% 
   mutate(
     row = row_number(),
     n_rows = max(row)
   ) %>% 
-  filter(n_rows > 1) %>% 
-  ungroup() %>% 
-  
-  # In order to view by year and month
+  ungroup()
+```
+
+# Check for duplicate MedStar IDs
+
+```{r}
+df_w_dups %>% 
   mutate(
-    year = year(dim_incident___incident_date_time),
-    month = month(dim_incident___incident_date_time)
+    year = year(incident_date_time),
+    month = month(incident_date_time)
   ) %>% 
+  # Only keep MedStar ID's with more than one row
+  filter(n_rows > 1) %>% 
+  # Only keep one row per MedStar ID. We want a count of ID's with at 
+  # least one duplicate row. Not a count of rows that are duplicates.
   filter(row == 1) %>% 
   count(year, month)
 ```
@@ -105,7 +109,7 @@ Actually, once this is all in FM Pro, the process may change. Oh well, do it thi
 
 ```{r}
 qc <- read_csv(
-  "data/dup_medstar_ids",
+  "data/dup_medstar_ids.csv",
   col_types = "ddd"
 )
 ```
@@ -119,64 +123,110 @@ qc <- qc %>%
 ```
 
 ```{r}
-write_csv(qc, "data/dup_medstar_ids")
+write_csv(qc, "data/dup_medstar_ids.csv")
 ```
 
 # Remove duplicate rows
 
-```{r}
-df_w_dups <- df_w_dups %>% 
-  group_by(dim_incident___incident_patient_care_report_number) %>% 
-  arrange(dim_incidentws___worksheet_date_time) %>% 
-  mutate(row = row_number()) %>% 
-  filter(row == 1) %>% 
-  select(-dim_incident___incident_date_time, -row) %>% 
-  ungroup()
-  
-  # For data checking
-  # arrange(
-  #   dim_incident___incident_patient_care_report_number,
-  #   dim_incidentws___worksheet_date_time
-  # ) %>% 
-  # filter(max(row) > 1)
+After further discussion we decided that it seem like a reasonable assumption to make that the medics typically only create a second worksheet in order to make it more accurate (or complete it). Therefore, whenever there are two worksheets with conflicting information, we should keep the second one. The exception is when only the first row contains an APS report number. In that case, we will keep the row with the APS report number because 1.) We can use later in data quality checks (i.e., to merge with APS data), and 2.) it is the presumably the screening responses that prompted the medic to report to APS.
+
+First, if only one row has an APS report number, keep that row. 
+1. We can use later in data quality checks.
+2. It is the presumably the screening responses that prompted the medic to report to APS.
+
+Then keep the second row, if applicable.
+
+```{r rows.print=11}
+# # For testing
+# # 1 = no aps report number. Keep second row.
+# # 2 = one aps report number. Keep row with aps report number.
+# # 3 = Both aps report number. Keep second row.
+# # 4 = Mix. Keep last row with aps report number.
+# # 5 = PCR with only one row and no aps report number
+# # 6 = PCR with only one row and an aps report number
+# tibble(
+#   incident_patient_care_report_number = c(1, 1, 2, 2, 3, 3, 4, 4, 4, 5, 6),
+#   x = c(1, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1),
+#   aps_report_number = c(NA, NA, 1001, NA, 1002, 1002, NA, 1003, 1003, NA, 1004),
+#   worksheet_date_time = c(1, 2, 1, 2, 1, 2, 2, 1, 3, 1, 1),
+#   row = c(1, 2, 1, 2, 1, 2, 1, 2, 3, 1, 1),
+#   n_rows = c(2, 2, 2, 2, 2, 2, 3, 3, 3, 1, 1)
+# ) %>% 
+#   # Identify set of PCR numbers with none, one, and multiple APS report numbers.
+#   # Also identify the latest worksheet date for each PCR set.
+#   group_by(incident_patient_care_report_number) %>% 
+#   mutate(
+#     max_date = worksheet_date_time == max(worksheet_date_time),
+#     aps_report_rows = case_when(
+#       # Identify PCR numbers with one row and don't consider them further.
+#       # All cases considered below have at least two rows.
+#       n_rows == 1 ~ "ignore",
+#       # Identify sets of PCR numbers with no APS reports
+#       all(is.na(aps_report_number)) ~ "none",
+#       # Identify sets of PCR numbers with multiple rows with an APS report
+#       sum(!is.na(aps_report_number)) > 1 ~ "multiple",
+#       # Finally identify rows with one NA and one APS report number
+#       sum(!is.na(aps_report_number)) == 1 ~ "one"
+#     )
+#   ) %>% 
+#   filter(
+#     # Keep all non-duplicated rows
+#     n_rows == 1 |
+#     # If there's only one row in the set with an APS number, keep that row.
+#     (aps_report_rows == "one" & !is.na(aps_report_number)) |
+#     # Otherwise, keep the last row by worksheet date time
+#     (aps_report_rows %in% c("none", "multiple") & max_date == TRUE)
+#   ) %>% 
+#   ungroup()
 ```
 
+```{r}
+df <- df_w_dups %>%
+  # Identify set of PCR numbers with none, one, and multiple APS report numbers.
+  # Also identify the latest worksheet date for each PCR set.
+  group_by(incident_patient_care_report_number) %>% 
+  mutate(
+    max_date = worksheet_date_time == max(worksheet_date_time),
+    aps_report_rows = case_when(
+      # Identify PCR numbers with one row and don't consider them further.
+      # All cases considered below have at least two rows.
+      n_rows == 1 ~ "ignore",
+      # Identify sets of PCR numbers with no APS reports
+      all(is.na(aps_report_number)) ~ "none",
+      # Identify sets of PCR numbers with multiple rows with an APS report
+      sum(!is.na(aps_report_number)) > 1 ~ "multiple",
+      # Finally identify rows with one NA and one APS report number
+      sum(!is.na(aps_report_number)) == 1 ~ "one"
+    )
+  ) %>% 
+  filter(
+    # Keep all non-duplicated rows
+    n_rows == 1 |
+    # If there's only one row in the set with an APS number, keep that row.
+    (aps_report_rows == "one" & !is.na(aps_report_number)) |
+    # Otherwise, keep the last row by worksheet date time
+    (aps_report_rows %in% c("none", "multiple") & max_date == TRUE)
+  ) %>% 
+  ungroup()
+```
+
+# Keep variables of interest (for import into FM Pro)
+
+```{r}
+df <- df %>%
+  select(-row:-aps_report_rows) # 39 columns
+```
 
 # Export for FM Pro
 
 ```{r}
 write_csv(
-  df_w_dups, 
-  "/Users/bradcannell/Desktop/detect_initial_screenings_2019_07_01_2020_09_30.csv",
+  df, 
+  paste0("/Users/bradcannell/Desktop/medstar_data_", Sys.Date() %>% format("%Y_%m_%d"), ".csv"),
   na = ""
 )
 ```
 
-
-
-
-# Check monthly data downloads from MedStar FTP server for duplicate MedStar IDs
-
-```{r}
-# November data - need to figure out a better way eventually.
-# Don't have time today.
-# Save as Excel file first.
-df_w_dups <- read_excel(
-  "/Users/bradcannell/Desktop/Detect Report-2020_11_01_070011.xlsx",
-  na = c("", " ", "NULL")
-)
-```
-
-```{r eval=FALSE}
-df_w_dups %>% 
-  group_by(Incident_Patient_Care_Report_Number) %>% 
-  mutate(
-    row = row_number()
-  ) %>% 
-  filter(max(row) > 1)
-```
-
-2020-11: There was one MedStar ID that had two rows. They were identical aside from the fact that one had an APS report number. We will keep that row. I'm making the change directly in the spreadsheet.
 
 
 
