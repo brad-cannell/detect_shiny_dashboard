@@ -49,7 +49,7 @@ Convert csv file to excel file outside of R.
 
 ```{r}
 df_w_dups <- read_excel(
-  "/Users/bradcannell/Desktop/Detect Report-2020_12_15_113210.xlsx",
+  "/Users/bradcannell/Desktop/Detect Report-2021_01_06_050118.xlsx",
   na = c("", " ", "NULL")
 )
 ```
@@ -88,7 +88,7 @@ df_w_dups <- df_w_dups %>%
 # Check for duplicate MedStar IDs
 
 ```{r}
-df_w_dups %>% 
+dups_by_year_month <- df_w_dups %>% 
   mutate(
     year = year(incident_date_time),
     month = month(incident_date_time)
@@ -121,6 +121,8 @@ qc <- qc %>%
       rename(count = n)
   )
 ```
+
+If there are no dups, then set to zero. Just do this manually for now.
 
 ```{r}
 write_csv(qc, "data/dup_medstar_ids.csv")
@@ -215,6 +217,29 @@ df <- df_w_dups %>%
 ```{r}
 df <- df %>%
   select(-row:-aps_report_rows) # 39 columns
+```
+
+# Reformat the date
+
+So that it can be imported into FM Pro.
+
+2021-01-07, from Sunil: Main reason the database refused the import is that timestamps have been reformatted to “2019-12-01T00:02:18Z” when it is expecting “12/1/2019  12:02:18 AM”.
+
+```{r}
+# For data checks
+# df %>% 
+#   select(where(is.POSIXct))
+```
+
+```{r}
+df <- df %>% 
+  mutate(
+    across(
+      c(incident_date_time, unit_arrived_on_scene_date_time, worksheet_date_time),
+      ~ format(.x, "%m/%d/%Y %I:%M:%S %p") 
+    ),
+    patient_date_of_birth = format(patient_date_of_birth, "%m/%d/%Y")
+  )
 ```
 
 # Export for FM Pro
