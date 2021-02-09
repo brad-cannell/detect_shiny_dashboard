@@ -7,6 +7,7 @@ library(dplyr)
 library(readr)
 library(tidyr)
 library(ggplot2)
+library(lubridate)
 ```
 
 The merged data used below was created in data_01_import.Rmd.
@@ -255,6 +256,57 @@ mean(merged_followup$n_calls_by_id, na.rm = TRUE)
 ```{r}
 count(merged_followup, n_calls_by_id)
 ```
+
+## Week-over-week comparison in F/U appointmensts scheduled
+
+Typically, I will run the recruiting report on Monday morning. What I'm intersted in knowing is how many people we recruited the week prior, and how that compares to two weeks prior?
+
+```{r}
+# Get today's date
+today <- today()
+# What is the first day of this week?
+# Week starts on Sunday by default
+floor_date_current <- floor_date(today, "week")
+# What is the last day of this week?
+# ceiling_date in the lubridate package returns the first date of the following 
+# period (Sunday by default). Subtract 1 to get the last date of the current 
+# period.
+ceiling_date_current <- ceiling_date(today, "week") - days(1)
+# Get last week's floor and ceiling dates
+floor_date_last_week <- floor_date_current - days(7)
+ceiling_date_last_week <- ceiling_date_current - days(7)
+# Get floor and ceiling dates from two weeks ago
+floor_date_two_weeks_ago <- floor_date_current - days(14)
+ceiling_date_two_weeks_ago <- ceiling_date_current - days(14)
+```
+
+How many people did we schedule last week?
+
+```{r}
+n_scheduled_last_week <- merged_followup %>% 
+  filter(call_date > floor_date_last_week & call_date < ceiling_date_last_week) %>% 
+  filter(scheduled == TRUE) %>% 
+  nrow()
+```
+
+How many people did we schedule two weeks ago?
+
+```{r}
+n_scheduled_two_weeks_ago <- merged_followup %>% 
+  filter(call_date > floor_date_two_weeks_ago & call_date < ceiling_date_two_weeks_ago) %>% 
+  filter(scheduled == TRUE) %>% 
+  nrow()
+```
+
+What is the absolute and percentage differences in F/U's scheduled
+
+```{r}
+tibble(
+  diff = n_scheduled_last_week - n_scheduled_two_weeks_ago,
+  percent_diff = (diff / n_scheduled_two_weeks_ago) * 100
+)
+```
+
 
 ## Created by
 

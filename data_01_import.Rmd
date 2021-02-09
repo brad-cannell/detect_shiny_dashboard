@@ -58,11 +58,17 @@ GiftCard contains one row for each gift card given out. It also contains all the
 
 Participant contains info from MedStar's EPCR including the original DETECT screenings.
 
+## Observational measures
+
+Data collected on the observational measures layout in FM Pro during the F/U interviews. 
+
+2021-02-08: Downloading this to check for incomplete
+
 ```{r}
 walk(
   # List of tables to import
   c("ParticipantCallLog", "PhoneRecruitment", "ParticipantScheduler", 
-    "Consent", "GiftCard", "Participant"),
+    "Consent", "GiftCard", "Participant", "ObservationalMeasures"),
   
   # Import and add data frames to the global environment
   function(x) {

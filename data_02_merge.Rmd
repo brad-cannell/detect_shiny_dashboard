@@ -305,7 +305,7 @@ participant_scheduler_sub <- participant_scheduler_sub %>%
 
 ### Check MedStar IDs
 
-How many MedStar IDs are in participant_scheduler, but not the merged_phone_recruitment? There shoudn't be any.
+How many MedStar IDs are in participant_scheduler, but not the merged_phone_recruitment? There shouldn't be any.
 
 ```{r}
 # Data check
