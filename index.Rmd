@@ -120,23 +120,23 @@ clutter_stats
 ```{r generalhealthindex, echo=FALSE}
 genhealth_pen_stats <- map_df(
     .x = set_names(c("general_health_created_by", "health_bp_systolic",
-                     "health_heart", "health_oxygen", "health_temp",
-                     "health_pain", "health_bp_diastolic", "outcomes_health_general",
-                     "outcomes_health_vigorous", "outcomes_health_moderate",
-                     "outcomes_health_uphill", "outcomes_health_bend",
-                     "outcomes_health_block", "outcomes_health_bathe",
-                     "outcomes4_weeks_pain", "outcomes_month_social",
-                     "outcomes_month_nervous", "outcomes_month_calm",
-                     "outcomes_month_blue", "outcomes_month_happy",
-                     "outcomes_month_dumps", "outcomes_tf_ill",
+                     "health_heart", "health_oxygen","health_temp",
+                     "health_pain", "health_bp_diastolic", 
+                     "outcomes_health_general", "outcomes_health_vigorous",  
+                     "outcomes_health_moderate", "outcomes_health_uphill",
+                     "outcomes_health_bend", "outcomes_health_block", 
+                     "outcomes_health_bathe", "outcomes4_weeks_pain", 
+                     "outcomes_month_social", "outcomes_month_nervous", 
+                     "outcomes_month_calm", "outcomes_month_blue", 
+                     "outcomes_month_happy", "outcomes_month_dumps", "outcomes_tf_ill",
                      "outcomes_tf_anybody", "outcomes_tf_bad", "outcomes_tf_health",
                      "depres_satisfied", "depres_hopeless", "depres_better",
                      "depres_activities", "depres_empty", "depres_bored",
                      "depres_spirits", "depres_afraid", "depres_happy",
                      "depres_helpless", "depres_home", "depres_memory",
                      "depres_alive", "depres_worthless", "depres_energy",
-                     "generalhealth_status", "nesarc_drink", "nesarc_months",
-                     "peg_pain", "peg_enjoyment", "peg_activity")),
+                     "nesarc_drink", "nesarc_months","peg_pain", "peg_enjoyment",
+                     "peg_activity")),
     .f = ~ freq_tables(merged_consented, !!sym(.x)))
 
 genhealth_pen_stats
@@ -154,18 +154,17 @@ gift_card_stats <- map_df(
                      "xc_peg", "xc_mo_feelings", "xc_mo_outcomes_tf",
                      "xc_depres_scale","xc_finance_person",
                      "xc_physical_person", "xc_sexual_person",
-                     "xc_aps_reported",
-                     "xc_interview_month", "xc_interview_year",
+                     "xc_aps_reported", "xc_interview_month", "xc_interview_year",
                      "xc_interview_month_year_abbr", "xc_mo_health", "xc_auditc",
                      "xc_neglect_person", "xc_aps_report", "xc_neglect_person")),
     .f = ~ freq_tables(merged_consented, !!sym(.x)))
 
-# not working:xc_eai_general_assessment, xc_eai_abuse_indicators,
+# not working:
+# xc_eai_general_assessment, xc_eai_abuse_indicators,
 # xc_eai_neglect_indicators, xc_eai_exploitation_indicators,
-# xc_eai_abandonment_indicators, xc_eai_environmental,
-# xc_emotional_incident_person, xc_detect, xcsummary
+# xc_eai_abandonment_indicators, xc_eai_environmental, xc_emotional_incident_person
 
-# not included: x_randomizer, xc_u_r_l, xc_case_i_d
+# not included: x_randomizer, xc_u_r_l, xc_case_i_d, xc_detect, xcsummary
 
 gift_card_stats
 ```
@@ -288,10 +287,10 @@ self_report_neglect_stats <- map_df(
                      "sexual_picture_last_time", "sexual_incident_reported_v2",
                      "sexual_incident_person_v2","sexual_person_live_then",
                      "sexual_person_live_now", "report_influence",
-                     "xc_lead_panel_summary_count", "neglect_go_help", 
+                     "xc_lead_panel_summary_count", "neglect_go_help",
                      "neglect_clean_help", "neglect_clean_reliable",
-                     "neglect_ready", "neglect_ready_help", "neglect_ready_reliable", 
-                     "neglect_bills", "neglect_bills_help", "neglect_bills_reliable", 
+                     "neglect_ready", "neglect_ready_help", "neglect_ready_reliable",
+                     "neglect_bills", "neglect_bills_help", "neglect_bills_reliable",
                      "neglect_person", "neglect_statement", "neglect_comments",
                      "finance_help", "finance_person", "emotional_yelled_times",
                      "emotional_yelled_age", "emotional_embarrassed_age",
@@ -307,13 +306,9 @@ self_report_neglect_stats <- map_df(
                      "fear_future", "fear_afraid", "fear_grateful", "fear_forward",
                      "fear_important", "emotional_incident_person_v2",
                      "report_private", "neglect_comments", "fear_afraid_response",
-                     "fear_future_response", "fear_grateful_response", 
+                     "fear_future_response", "fear_grateful_response",
                      "fear_forward_response", "fear_important_response" )),
     .f = ~ freq_tables(merged_consented, !!sym(.x)))
 
-
 self_report_neglect_stats
-
-
 ```
-

@@ -66,6 +66,7 @@ consent_sub <- consent %>%
     )
 ```
 
+
 ```{r aps_investigations_sub}
 aps_investigations_sub <- aps_investigations %>%
   select(aps_investigation_created_by = x_created_by,
@@ -73,10 +74,7 @@ aps_investigations_sub <- aps_investigations %>%
          aps_investigation_status = x_record_status,
          medstar_id, name_full, aps_report, aps_times, aps_first, aps_recent,
          x_record_month, x_record_year, xc_lead_panel_summary_count)
-
-aps_investigations_sub$aps_recent[aps_investigations_sub$aps_recent == "In the past year but more than a month ago"] <- "More than 1 month ago"
 ```
-
 
 ```{r clutter}
 # Clutter scale
@@ -89,6 +87,7 @@ clutter_scale_sub <- clutter_scale %>%
          clutter_scale_status = x_record_status, name_last, x_record_month,
          x_record_year)
 ```
+
 
 ```{r generalhealth}
 # General Health
@@ -106,41 +105,10 @@ general_health_sub <- general_health %>%
          depres_hopeless, depres_better, depres_activities, depres_empty,
          depres_bored, depres_spirits, depres_afraid, depres_happy,
          depres_helpless, depres_home, depres_memory, depres_alive,
-         depres_worthless, depres_energy,
-         generalhealth_status = x_record_status, auditc_drink, auditc_day,
+         depres_worthless, depres_energy, x_record_status, auditc_drink, auditc_day,
          auditc_five, health_bp_diastolic, outcomes_health_unable, nesarc_drink,
          nesarc_months, x_record_month, x_record_year, peg_pain,
          peg_enjoyment, peg_activity)
-
-general_health_sub$outcomes_health_vigorous[general_health_sub$outcomes_health_vigorous == "Yes, limited for more than 3 months"] <- "Yes, more than 3 months"
-
-general_health_sub$outcomes_health_vigorous[general_health_sub$outcomes_health_vigorous == "Yes, limited for 3 months or less"] <- "Yes, less than 3 months"
-
-general_health_sub$outcomes_health_moderate[general_health_sub$outcomes_health_moderate == "Yes, limited for more than 3 months"] <- "Yes, more than 3 months"
-
-general_health_sub$outcomes_health_moderate[general_health_sub$outcomes_health_moderate == "Yes, limited for 3 months or less"] <- "Yes, less than 3 months"
-
-general_health_sub$outcomes_health_uphill[general_health_sub$outcomes_health_uphill == "Yes, limited for more than 3 months"] <- "Yes, more than 3 months"
-
-general_health_sub$outcomes_health_uphill[general_health_sub$outcomes_health_uphill == "Yes, limited for 3 months or less"] <- "Yes, less than 3 months"
-
-general_health_sub$outcomes_health_bend[general_health_sub$outcomes_health_bend == "Yes, limited for more than 3 months"] <- "Yes, more than 3 months"
-
-general_health_sub$outcomes_health_bend[general_health_sub$outcomes_health_bend == "Yes, limited for 3 months or less"] <- "Yes, less than 3 months"
-
-general_health_sub$outcomes_health_block[general_health_sub$outcomes_health_block == "Yes, limited for more than 3 months"] <- "Yes, more than 3 months"
-
-general_health_sub$outcomes_health_block[general_health_sub$outcomes_health_block == "Yes, limited for 3 months or less"] <- "Yes, less than 3 months"
-
-general_health_sub$outcomes_health_bathe[general_health_sub$outcomes_health_bathe == "Yes, limited for more than 3 months"] <- "Yes, more than 3 months"
-
-general_health_sub$outcomes_health_bathe[general_health_sub$outcomes_health_bathe == "Yes, limited for 3 months or less"] <- "Yes, less than 3 months"
-
-general_health_sub$peg_pain[general_health_sub$peg_pain == "10 - Pain as bad as you can imagine"] <- "10 - painful"
-
-general_health_sub$peg_enjoyment[general_health_sub$peg_enjoyment == "10 - Pain as bad as you can imagine"] <- "10 - painful"
-
-general_health_sub$peg_activity[general_health_sub$peg_activity == "10 - Pain as bad as you can imagine"] <- "10 - painful"
 ```
 
 ```{r giftcard}
@@ -159,7 +127,6 @@ gift_card_sub <- gift_card %>%
          xc_eai_exploitation_indicators, xc_eai_abandonment_indicators,
          xc_eai_environmental, xc_summary, xc_aps_reported, xc_case_i_d,
          xc_interview_month, xc_interview_year, xc_interview_month_year_abbr)
-
 ```
 
 
@@ -349,7 +316,7 @@ merged_consented <- merged_consented %>%
                 sexual_person_friends, finance_stranger_permission_times,
                 fear_future, fear_afraid, fear_grateful, fear_forward,
                 fear_important, emotional_incident_person_v2,
-                report_private, xc_neglect_person),
+                report_private, xc_neglect_person, outcomes_health_general),
       .fns  = ~ if_else(stringr::str_detect(.x, "know"), "Don't know", .x)
     )
   )
@@ -374,175 +341,3 @@ merged_consented$fear_forward_response <-
 merged_consented$fear_important_response <- 
   str_replace(merged_consented$fear_important_response, c("\r"), "")
 ```
-
-
-<!-- ```{r} -->
-<!-- # Shorten labels -->
-
-<!-- # 536 - 727: PEG - A Three-Item Scale Assessing Pain Intensity and Interference -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   0 - No pain\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   0 - No pain\r    c. Pain Interfered with General Activity During the Past Week:   0 - No pain"] <- "peg_1/2/3: 0 / 0 / 0" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   10 - Pain as bad as you can imagine\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   10 - Pain as bad as you can imagine\r    c. Pain Interfered with General Activity During the Past Week:   10 - Pain as bad as you can imagine"] <- "peg_1/2/3: 10 / 10 / 10" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   8\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   8\r    c. Pain Interfered with General Activity During the Past Week:   8"] <- "peg_1/2/3: 8 / 8 / 8" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   5\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   5\r    c. Pain Interfered with General Activity During the Past Week:   5"] <- "peg_1/2/3: 5 / 5 / 5" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   2\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   0 - No pain\r    c. Pain Interfered with General Activity During the Past Week:   0 - No pain"] <- "peg_1/2/3: 2 / 0 / 0" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   7\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   7\r    c. Pain Interfered with General Activity During the Past Week:   7"] <- "peg_1/2/3: 7 / 7 / 7" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   6\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   6\r    c. Pain Interfered with General Activity During the Past Week:   6"] <- "peg_1/2/3: 6 / 6 / 6" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   9\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   9\r    c. Pain Interfered with General Activity During the Past Week:   9"] <- "peg_1/2/3: 9 / 9 / 9" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   8\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   10 - Pain as bad as you can imagine\r    c. Pain Interfered with General Activity During the Past Week:   10 - Pain as bad as you can imagine"] <- "peg_1/2/3: 8 / 10 / 10" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   1\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   1\r    c. Pain Interfered with General Activity During the Past Week:   1"] <- "peg_1/2/3: 1 / 1 / 1" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   3\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   3\r    c. Pain Interfered with General Activity During the Past Week:   3"] <- "peg_1/2/3: 3 / 3 / 3" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   1\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   0 - No pain\r    c. Pain Interfered with General Activity During the Past Week:   0 - No pain"] <- "peg_1/2/3: 1 / 0 / 0" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   4\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   4\r    c. Pain Interfered with General Activity During the Past Week:   4"] <- "peg_1/2/3: 4 / 4 / 4" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   8\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   9\r    c. Pain Interfered with General Activity During the Past Week:   9"] <- "peg_1/2/3: 8 / 9 / 9" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   5\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   0 - No pain\r    c. Pain Interfered with General Activity During the Past Week:   0 - No pain"] <- "peg_1/2/3: 5 / 0 / 0" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   6\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   8\r    c. Pain Interfered with General Activity During the Past Week:   8"] <- "peg_1/2/3: 6 / 8 / 8" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   9\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   10 - Pain as bad as you can imagine\r    c. Pain Interfered with General Activity During the Past Week:   10 - Pain as bad as you can imagine"] <- "peg_1/2/3: 9 / 10 / 10" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   1\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   0 - No pain\r    c. Pain Interfered with General Activity During the Past Week:   1"] <- "peg_1/2/3: 1 / 0 / 1" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   2\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   1\r    c. Pain Interfered with General Activity During the Past Week:   1"] <- "peg_1/2/3: 2 / 1 / 1" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   2\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   2\r    c. Pain Interfered with General Activity During the Past Week:   2"] <- "peg_1/2/3: 2 / 2 / 2" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   5\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   4\r    c. Pain Interfered with General Activity During the Past Week:   4"] <- "peg_1/2/3: 5 / 4 / 4" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   5\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   5\r    c. Pain Interfered with General Activity During the Past Week:   6"] <- "peg_1/2/3: 5 / 5 / 6" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   7\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   10 - Pain as bad as you can imagine\r    c. Pain Interfered with General Activity During the Past Week:   10 - Pain as bad as you can imagine"] <- "peg_1/2/3: 7 / 10 / 10" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   8\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   6\r    c. Pain Interfered with General Activity During the Past Week:   6"] <- "peg_1/2/3: 8 / 6 / 6" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   8\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   7\r    c. Pain Interfered with General Activity During the Past Week:   7"] <- "peg_1/2/3: 8 / 7 / 7" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   3\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   0 - No pain\r    c. Pain Interfered with General Activity During the Past Week:   2"] <- "peg_1/2/3: 3 / 0 / 2" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   3\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   4\r    c. Pain Interfered with General Activity During the Past Week:   4"] <- "peg_1/2/3: 3 / 4 / 4" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   3\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   7\r    c. Pain Interfered with General Activity During the Past Week:   7"] <- "peg_1/2/3: 3 / 7 / 7" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   4\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   0 - No pain\r    c. Pain Interfered with General Activity During the Past Week:   0 - No pain"] <- "peg_1/2/3: 4 / 0 / 0" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   5\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   3\r    c. Pain Interfered with General Activity During the Past Week:   3"] <- "peg_1/2/3: 5 / 3 / 3" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   6\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   5\r    c. Pain Interfered with General Activity During the Past Week:   5"] <- "peg_1/2/3: 6 / 5 / 5" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   6\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   9\r    c. Pain Interfered with General Activity During the Past Week:   9"] <- "peg_1/2/3: 6 / 9 / 9" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   7\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   5\r    c. Pain Interfered with General Activity During the Past Week:   5"] <- "peg_1/2/3: 7 / 5 / 5" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   8\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   0 - No pain\r    c. Pain Interfered with General Activity During the Past Week:   0 - No pain"] <- "peg_1/2/3: 8 / 0 / 0" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   1\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   1\r    c. Pain Interfered with General Activity During the Past Week:   0 - No pain"] <- "peg_1/2/3: 1 / 1 / 0" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   10 - Pain as bad as you can imagine\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   6\r    c. Pain Interfered with General Activity During the Past Week:   6"] <- "peg_1/2/3: 10 / 6 / 6" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   2\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   0 - No pain\r    c. Pain Interfered with General Activity During the Past Week:   2"] <- "peg_1/2/3: 2 / 0 / 2" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   2\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   10 - Pain as bad as you can imagine\r    c. Pain Interfered with General Activity During the Past Week:   10 - Pain as bad as you can imagine"] <- "peg_1/2/3: 2 / 10 / 10" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   2\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   5\r    c. Pain Interfered with General Activity During the Past Week:   5"] <- "peg_1/2/3: 2 / 5 / 5" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   3\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   2\r    c. Pain Interfered with General Activity During the Past Week:   2"] <- "peg_1/2/3: 3 / 2 / 2" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   3\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   7\r    c. Pain Interfered with General Activity During the Past Week:   10 - Pain as bad as you can imagine"] <- "peg_1/2/3: 3 / 7 / 10" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   4\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   2\r    c. Pain Interfered with General Activity During the Past Week:   3"] <- "peg_1/2/3: 4 / 2 / 3" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   4\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   4\r    c. Pain Interfered with General Activity During the Past Week:   3"] <- "peg_1/2/3: 4 / 4 / 3" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   5\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   3\r    c. Pain Interfered with General Activity During the Past Week:   4"] <- "peg_1/2/3: 5 / 3 / 4" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   5\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   3\r    c. Pain Interfered with General Activity During the Past Week:   5"] <- "peg_1/2/3: 5 / 3 / 5" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   5\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   5\r    c. Pain Interfered with General Activity During the Past Week:   2"] <- "peg_1/2/3: 5 / 5 / 2" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   6\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   4\r    c. Pain Interfered with General Activity During the Past Week:   4"] <- "peg_1/2/3: 6 / 4 / 4" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   6\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   5\r    c. Pain Interfered with General Activity During the Past Week:   6"] <- "peg_1/2/3: 6 / 5 / 6" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   6\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   8\r    c. Pain Interfered with General Activity During the Past Week:   7"] <- "peg_1/2/3: 6 / 8 / 7" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   7\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   10 - Pain as bad as you can imagine\r    c. Pain Interfered with General Activity During the Past Week:   8"] <- "peg_1/2/3: 7 / 10 / 8" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   7\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   10 - Pain as bad as you can imagine\r    c. Pain Interfered with General Activity During the Past Week:   9"] <- "peg_1/2/3: 7 / 10 / 9" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   7\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   7\r    c. Pain Interfered with General Activity During the Past Week:   0 - No pain"] <- "peg_1/2/3: 7 / 7 / 0" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   7\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   8\r    c. Pain Interfered with General Activity During the Past Week:   8"] <- "peg_1/2/3:  7 / 8 / 8" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   7\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   8\r    c. Pain Interfered with General Activity During the Past Week:   9"] <- "peg_1/2/3:  7 / 8 / 9" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   7\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   9\r    c. Pain Interfered with General Activity During the Past Week:   10 - Pain as bad as you can imagine"] <- "peg_1/2/3: 7 / 9 / 10" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   7\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   9\r    c. Pain Interfered with General Activity During the Past Week:   9"] <- "peg_1/2/3:  7 / 9 / 9" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   8\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   2\r    c. Pain Interfered with General Activity During the Past Week:   2"] <- "peg_1/2/3:  8 / 2 / 2" -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   8\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   8\r    c. Pain Interfered with General Activity During the Past Week:   7"] <- "peg_1/2/3:  8 / 8 / 7 " -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   8\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   9\r    c. Pain Interfered with General Activity During the Past Week:   8"] <- "peg_1/2/3:  8 / 9 / 8 " -->
-
-<!-- merged_consented$xc_peg[merged_consented$xc_peg == "\r    a. Pain on Average in the Past Week:   0 - No pain\r    b. Pain Interfered with Enjoyment of Life During the Past Week:   0 - No pain\r    c. Pain Interfered with General Activity During the Past Week:   4"] <- "peg_1/2/3:  0 / 0 / 4" -->
-
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # -->
-<!-- # merged_consented$xc_peg[merged_consented$xc_peg == ""] <- "peg_1/2/3:  /  / " -->
-<!-- # 728 - 967 -->
-<!-- # xc_mo_feelings -->
-
-<!-- # 978 - 1035 -->
-<!-- # xc_mo_outcomes_tf -->
-<!-- ``` -->
-
-
