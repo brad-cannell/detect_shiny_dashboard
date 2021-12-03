@@ -27,8 +27,8 @@ source_rmd = function(file, ...) {
 ```
 
 ```{r sourcecode_dashboards, message=FALSE, results='hide', include=FALSE}
-source_rmd("dashboard_01_import.Rmd")
-source_rmd("dashboard_02_merge.Rmd")
+# source_rmd("dashboard_01_import.Rmd")
+# source_rmd("dashboard_02_merge.Rmd")
 ```
 
 ```{r freq_tables_function, message=FALSE, warning=FALSE, results='hide', include=FALSE }
@@ -51,7 +51,7 @@ Sections {.tabset}
 ### Consent
 
 ```{r consentindex, echo=FALSE}
-consent_stats <- map_df(
+consent_stats <- map(
   .x = set_names(c("consent_created_by", "consent_timestamp", "consent_status",
                    "consent_record_month", "consent_record_year",
                    "consent_interview_month", "consent_interview_year")),
@@ -64,7 +64,7 @@ consent_stats
 ### Sociodemographics
 
 ```{r socioindex, echo=FALSE}
-socio_socio_stats <- map_df(
+socio_socio_stats <- map(
   .x = set_names(c("sociodemographic_created_by", "sociodemographic_status",
                    "sode_people", "sode_hispanic","sode_military",
                    "sode_unwanted", "sode_sexual", "hsi_contact",
